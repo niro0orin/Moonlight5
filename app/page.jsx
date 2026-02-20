@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-const RTL = "\u202B"; // Right-to-left embedding mark
+const RTL = "\u202B";
 
 function buildCopyText({ term, pronunciation, meaning, definition, imageUrl }) {
   const lines = [
@@ -20,14 +20,12 @@ export default function Page() {
   const [theme, setTheme] = useState("light");
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // الحقول الأربعة
   const [term, setTerm] = useState("");
   const [pronunciation, setPronunciation] = useState("");
   const [meaning, setMeaning] = useState("");
   const [definition, setDefinition] = useState("");
-
-  // الصورة
   const [imageUrl, setImageUrl] = useState("");
 
   const copyText = useMemo(
@@ -43,23 +41,31 @@ export default function Page() {
     const q = query.trim();
     if (!q) return;
 
+    setError("");
     setLoading(true);
+
     try {
-      // ملاحظة: الآن عندك /api/term يرجّع بيانات (حتى لو مؤقتة)
       const res = await fetch("/api/term", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q })
       });
 
-      const data = await res.json();
+      const rawText = await res.text();
+      let data = {};
+      try { data = JSON.parse(rawText); } catch { data = { error: rawText }; }
+
+      if (!res.ok || data.error) {
+        setError(data.error || `API error (${res.status})`);
+        setLoading(false);
+        return;
+      }
 
       setTerm(data.term || q);
       setPronunciation(data.pronunciation_ar || "");
       setMeaning(data.meaning_ar || "");
       setDefinition(data.definition_ar || "");
 
-      // صورة من النت (لو API حق الصورة موجود عندك)
       const imgRes = await fetch(`/api/image?term=${encodeURIComponent(data.term || q)}`);
       if (imgRes.ok) {
         const img = await imgRes.json();
@@ -68,19 +74,15 @@ export default function Page() {
         setImageUrl("");
       }
     } catch (e) {
-      alert(`Error: ${e.message || e}`);
+      setError(e.message || String(e));
     } finally {
       setLoading(false);
     }
   }
 
   async function copyAll() {
-    try {
-      await navigator.clipboard.writeText(copyText);
-      alert("Copied ✅");
-    } catch {
-      alert("Copy failed ❌");
-    }
+    await navigator.clipboard.writeText(copyText);
+    alert("Copied ✅");
   }
 
   function onKeyDown(e) {
@@ -97,10 +99,18 @@ export default function Page() {
           </button>
         </div>
 
+        {error ? (
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div className="small" style={{ color: "#ffd1d1" }}>
+              Error: {error}
+            </div>
+          </div>
+        ) : null}
+
         <div className="searchRow">
           <input
             className="input"
-            placeholder="اكتب المصطلح هنا… (مثال: Osteomyelitis)"
+            placeholder="اكتب المصطلح هنا…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
@@ -111,7 +121,6 @@ export default function Page() {
         </div>
 
         <div className="grid">
-          {/* الصورة يسار */}
           <div className="card imageBox">
             <div className="small">الصورة (من النت)</div>
             {imageUrl ? (
@@ -123,7 +132,6 @@ export default function Page() {
             {imageUrl ? <div className="small">{imageUrl}</div> : null}
           </div>
 
-          {/* البيانات يمين */}
           <div className="card fields">
             <div>
               <div className="label">English term</div>
@@ -147,23 +155,9 @@ export default function Page() {
 
             <div className="actions">
               <button className="btn" onClick={copyAll}>Copy all</button>
-              <button
-                className="btn"
-                onClick={() => {
-                  setQuery("");
-                  setTerm("");
-                  setPronunciation("");
-                  setMeaning("");
-                  setDefinition("");
-                  setImageUrl("");
-                }}
-              >
+              <button className="btn" onClick={() => { setQuery(""); setTerm(""); setPronunciation(""); setMeaning(""); setDefinition(""); setImageUrl(""); setError(""); }}>
                 Clear
               </button>
-            </div>
-
-            <div className="notice">
-              النسخ يطلع بنفس تنسيق RTL اللي تبيه + رابط الصورة.
             </div>
           </div>
         </div>
