@@ -22,20 +22,19 @@ export async function POST(req) {
       body: JSON.stringify({
         model: "gpt-4.1-mini",
         input: `
-حوّل المصطلح التالي إلى JSON فقط بدون أي نص إضافي:
+اعطني JSON فقط:
 
-${q}
-
-الشكل المطلوب:
 {
-"term": "English term only",
-"pronunciation_ar": "النطق بالحروف العربية",
-"meaning_ar": "المعنى بالعربي",
-"definition_ar": "تعريف عربي مختصر"
+"term": "",
+"pronunciation_ar": "",
+"meaning_ar": "",
+"definition_ar": ""
 }
 
+المصطلح: ${q}
+
 قواعد:
-- term لازم يكون إنجليزي دائمًا حتى لو الإدخال عربي
+- term لازم يكون إنجليزي دائمًا
 - لا تترك أي خانة فارغة
         `,
         text: {
@@ -48,14 +47,15 @@ ${q}
 
     const data = await response.json();
 
-    const text = data.output[0].content[0].text;
+    // 🔥 الحل هنا: استخدام output_text (أضمن)
+    const text = data.output_text;
 
     let parsed;
     try {
       parsed = JSON.parse(text);
     } catch {
       return NextResponse.json({
-        error: "JSON parsing failed",
+        error: "JSON parse failed",
         raw: text
       }, { status: 500 });
     }
